@@ -5,4 +5,5 @@ print("Hello Australia")
 print("Hello India")
 print("the UK")
 print("canada")
+print("hello mexico")
 
