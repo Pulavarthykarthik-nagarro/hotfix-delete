@@ -19,16 +19,7 @@
     },
     "EventsOutOfOrderPolicy": {
       "type": "string"
-    },
-    "OutputErrorPolicy": {
-      "type": "string"
-    },
-    "EventsOutOfOrderMaxDelayInSeconds": {
-      "type": "int"
-    },
-    "EventsLateArrivalMaxDelayInSeconds": {
-      "type": "int"
-    },
+
     "DataLocale": {
       "type": "string"
     },
