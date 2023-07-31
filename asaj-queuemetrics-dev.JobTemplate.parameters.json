@@ -1,0 +1,146 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.1.0.0",
+  "parameters": {
+    "Name": {
+      "value": "asaj-queuemetrics-dev"
+    },
+    "Location": {
+      "value": "Central US"
+    },
+    "Tags": {
+      "value": {
+        "application": "cdp",
+        "data-confidentiality": "not-applicable",
+        "hidden-link:/Microsoft.StreamAnalytics/streamingjobs/settings": "{\"createdFrom\":\"CICD\"}"
+      }
+    },
+    "OutputStartMode": {
+      "value": "JobStartTime"
+    },
+    "OutputStartTime": {
+      "value": "2023-01-01T00:00:00Z"
+    },
+    "EventsOutOfOrderPolicy": {
+      "value": "Adjust"
+    },
+    "OutputErrorPolicy": {
+      "value": "Stop"
+    },
+    "EventsOutOfOrderMaxDelayInSeconds": {
+      "value": 0
+    },
+    "EventsLateArrivalMaxDelayInSeconds": {
+      "value": 5
+    },
+    "DataLocale": {
+      "value": "en-US"
+    },
+    "CompatibilityLevel": {
+      "value": "1.2"
+    },
+    "ContentStoragePolicy": {
+      "value": "SystemAccount"
+    },
+    "Transformation": {
+      "value": {
+        "StreamingUnits": 7
+      }
+    },
+    "Inputs_stream-blip-dwelltime": {
+      "value": {
+        "DataSource": {
+          "ConsumerGroupName": "cg_streamanalytics_blip",
+          "EventHubName": "evh-blip-dub",
+          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
+          "AuthenticationMode": "Msi"
+        }
+      }
+    },
+    "Inputs_stream-blipperuser-exportperuser": {
+      "value": {
+        "DataSource": {
+          "ConsumerGroupName": "cg_streamanalytics_blipperuser",
+          "EventHubName": "evh-blip-dub",
+          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
+          "AuthenticationMode": "Msi"
+        }
+      }
+    },
+    "Inputs_stream-zensors-immigrationcount": {
+      "value": {
+        "DataSource": {
+          "ConsumerGroupName": "cg_streamanalytics_immigrationcount",
+          "EventHubName": "evh-zensors-ork",
+          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
+          "AuthenticationMode": "Msi"
+        }
+      }
+    },
+    "Inputs_stream-zensors-immigrationqueue": {
+      "value": {
+        "DataSource": {
+          "ConsumerGroupName": "cg_streamanalytics_immigrationqueue",
+          "EventHubName": "evh-zensors-ork",
+          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
+          "AuthenticationMode": "Msi"
+        }
+      }
+    },
+    "Inputs_stream-zensors-passengercount": {
+      "value": {
+        "DataSource": {
+          "ConsumerGroupName": "cg_streamanalytics_passengercount",
+          "EventHubName": "evh-zensors-ork",
+          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
+          "AuthenticationMode": "Msi"
+        }
+      }
+    },
+    "Inputs_stream-zensors-passengerqueue": {
+      "value": {
+        "DataSource": {
+          "ConsumerGroupName": "cg_streamanalytics_passengerqueue",
+          "EventHubName": "evh-zensors-ork",
+          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
+          "AuthenticationMode": "Msi"
+        }
+      }
+    },
+    "Inputs_ref-location": {
+      "value": {
+        "DataSource": {
+          "AccountName": "dlscdpdev001",
+          "Container": "auxiliary",
+          "PathPattern": "location.csv",
+          "DateFormat": "yyyy/MM/dd",
+          "TimeFormat": "HH",
+          "AuthenticationMode": "Msi"
+        }
+      }
+    },
+    "Inputs_stream-test": {
+      "value": {
+        "DataSource": {
+          "SourcePartitionCount": 1,
+          "AccountName": "dlscdpdev001",
+          "Container": "auxiliary",
+          "PathPattern": "stream/",
+          "DateFormat": "yyyy/MM/dd",
+          "TimeFormat": "HH",
+          "AuthenticationMode": "Msi"
+        }
+      }
+    },
+    "Outputs_out-pbi-ds-queuemetrics": {
+      "value": {
+        "DataSource": {
+          "DataSet": "Queue Management Live",
+          "DatasetTable": "Queue Live",
+          "GroupId": "9446d12a-183c-4727-9ab1-b2702f431f5c",
+          "AuthenticationMode": "Msi"
+        }
+      }
+    }
+  }
+}
