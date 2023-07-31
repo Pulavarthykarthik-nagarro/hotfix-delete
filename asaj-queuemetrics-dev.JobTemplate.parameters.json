@@ -14,55 +14,8 @@
       "value": "Stop"
 
     },
-    "Inputs_stream-blip-dwelltime": {
-      "value": {
-        "DataSource": {
-          "ConsumerGroupName": "cg_streamanalytics_blip",
-          "EventHubName": "evh-blip-dub",
-          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
-          "AuthenticationMode": "Msi"
-        }
-      }
-    },
-    "Inputs_stream-blipperuser-exportperuser": {
-      "value": {
-        "DataSource": {
-          "ConsumerGroupName": "cg_streamanalytics_blipperuser",
-          "EventHubName": "evh-blip-dub",
-          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
-          "AuthenticationMode": "Msi"
-        }
-      }
-    },
-    "Inputs_stream-zensors-immigrationcount": {
-      "value": {
-        "DataSource": {
-          "ConsumerGroupName": "cg_streamanalytics_immigrationcount",
-          "EventHubName": "evh-zensors-ork",
-          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
-          "AuthenticationMode": "Msi"
-        }
-      }
-    },
-    "Inputs_stream-zensors-immigrationqueue": {
-      "value": {
-        "DataSource": {
-          "ConsumerGroupName": "cg_streamanalytics_immigrationqueue",
-          "EventHubName": "evh-zensors-ork",
-          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
-          "AuthenticationMode": "Msi"
-        }
-      }
-    },
-    "Inputs_stream-zensors-passengercount": {
-      "value": {
-        "DataSource": {
-          "ConsumerGroupName": "cg_streamanalytics_passengercount",
-          "EventHubName": "evh-zensors-ork",
-          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
-          "AuthenticationMode": "Msi"
-        }
-      }
+ConsumerGroupName": "cg_streamanalytics_immigrationcount",
+ 
     },
     "Inputs_stream-zensors-passengerqueue": {
       "value": {
