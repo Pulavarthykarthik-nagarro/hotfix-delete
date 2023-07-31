@@ -21,8 +21,7 @@
     "OutputStartTime": {
       "value": "2023-01-01T00:00:00Z"
     },
-    "EventsOutOfOrderPolicy": {
-      "value": "Adjust"
+
     },
     "OutputErrorPolicy": {
       "value": "Stop"
