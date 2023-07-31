@@ -15,31 +15,7 @@
 
     },
 ConsumerGroupName": "cg_streamanalytics_immigrationcount",
-          "EventHubName": "evh-zensors-ork",
-          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
-          "AuthenticationMode": "Msi"
-        }
-      }
-    },
-    "Inputs_stream-zensors-immigrationqueue": {
-      "value": {
-        "DataSource": {
-          "ConsumerGroupName": "cg_streamanalytics_immigrationqueue",
-          "EventHubName": "evh-zensors-ork",
-          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
-          "AuthenticationMode": "Msi"
-        }
-      }
-    },
-    "Inputs_stream-zensors-passengercount": {
-      "value": {
-        "DataSource": {
-          "ConsumerGroupName": "cg_streamanalytics_passengercount",
-          "EventHubName": "evh-zensors-ork",
-          "ServiceBusNamespace": "evhns-cdp-dev-neu-001",
-          "AuthenticationMode": "Msi"
-        }
-      }
+ 
     },
     "Inputs_stream-zensors-passengerqueue": {
       "value": {
