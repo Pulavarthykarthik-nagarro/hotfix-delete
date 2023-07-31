@@ -4,25 +4,7 @@
   "parameters": {
     "Name": {
       "type": "string"
-    },
-    "Location": {
-      "type": "string"
-    },
-    "Tags": {
-      "type": "object"
-    },
-    "OutputStartMode": {
-      "type": "string"
-    },
-    "OutputStartTime": {
-      "type": "string"
-    },
-    "EventsOutOfOrderPolicy": {
-      "type": "string"
-
-    "DataLocale": {
-      "type": "string"
-    },
+  
     "CompatibilityLevel": {
       "type": "string"
     },

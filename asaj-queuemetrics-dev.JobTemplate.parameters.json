@@ -10,36 +10,9 @@
     },
 
     },
-    "OutputStartMode": {
-      "value": "JobStartTime"
-    },
-    "OutputStartTime": {
-      "value": "2023-01-01T00:00:00Z"
-    },
-
-    },
     "OutputErrorPolicy": {
       "value": "Stop"
-    },
-    "EventsOutOfOrderMaxDelayInSeconds": {
-      "value": 0
-    },
-    "EventsLateArrivalMaxDelayInSeconds": {
-      "value": 5
-    },
-    "DataLocale": {
-      "value": "en-US"
-    },
-    "CompatibilityLevel": {
-      "value": "1.2"
-    },
-    "ContentStoragePolicy": {
-      "value": "SystemAccount"
-    },
-    "Transformation": {
-      "value": {
-        "StreamingUnits": 7
-      }
+
     },
     "Inputs_stream-blip-dwelltime": {
       "value": {
