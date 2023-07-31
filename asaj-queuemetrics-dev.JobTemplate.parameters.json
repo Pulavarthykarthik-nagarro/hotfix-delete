@@ -8,12 +8,7 @@
     "Location": {
       "value": "Central US"
     },
-    "Tags": {
-      "value": {
-        "application": "cdp",
-        "data-confidentiality": "not-applicable",
-        "hidden-link:/Microsoft.StreamAnalytics/streamingjobs/settings": "{\"createdFrom\":\"CICD\"}"
-      }
+
     },
     "OutputStartMode": {
       "value": "JobStartTime"
