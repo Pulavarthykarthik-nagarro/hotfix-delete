@@ -1,0 +1,558 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.1.0.0",
+  "parameters": {
+    "Name": {
+      "type": "string"
+    },
+    "Location": {
+      "type": "string"
+    },
+    "Tags": {
+      "type": "object"
+    },
+    "OutputStartMode": {
+      "type": "string"
+    },
+    "OutputStartTime": {
+      "type": "string"
+    },
+    "EventsOutOfOrderPolicy": {
+      "type": "string"
+    },
+    "OutputErrorPolicy": {
+      "type": "string"
+    },
+    "EventsOutOfOrderMaxDelayInSeconds": {
+      "type": "int"
+    },
+    "EventsLateArrivalMaxDelayInSeconds": {
+      "type": "int"
+    },
+    "DataLocale": {
+      "type": "string"
+    },
+    "CompatibilityLevel": {
+      "type": "string"
+    },
+    "ContentStoragePolicy": {
+      "type": "string"
+    },
+    "Transformation": {
+      "type": "object"
+    },
+    "Inputs_stream-blip-dwelltime": {
+      "type": "object"
+    },
+    "Inputs_stream-blipperuser-exportperuser": {
+      "type": "object"
+    },
+    "Inputs_stream-zensors-immigrationcount": {
+      "type": "object"
+    },
+    "Inputs_stream-zensors-immigrationqueue": {
+      "type": "object"
+    },
+    "Inputs_stream-zensors-passengercount": {
+      "type": "object"
+    },
+    "Inputs_stream-zensors-passengerqueue": {
+      "type": "object"
+    },
+    "Inputs_ref-location": {
+      "type": "object"
+    },
+    "Inputs_stream-test": {
+      "type": "object"
+    },
+    "Outputs_out-pbi-ds-queuemetrics": {
+      "type": "object"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.StreamAnalytics/StreamingJobs",
+      "apiVersion": "2021-10-01-preview",
+      "name": "[parameters('Name')]",
+      "location": "[parameters('Location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "tags": "[parameters('Tags')]",
+      "properties": {
+        "sku": {
+          "name": "StandardV2"
+        },
+        "outputStartMode": "[parameters('OutputStartMode')]",
+        "outputStartTime": "[if(equals(parameters('OutputStartMode'),'CustomTime'), parameters('OutputStartTime'), json('null'))]",
+        "eventsOutOfOrderPolicy": "[parameters('EventsOutOfOrderPolicy')]",
+        "outputErrorPolicy": "[parameters('OutputErrorPolicy')]",
+        "eventsOutOfOrderMaxDelayInSeconds": "[parameters('EventsOutOfOrderMaxDelayInSeconds')]",
+        "eventsLateArrivalMaxDelayInSeconds": "[parameters('EventsLateArrivalMaxDelayInSeconds')]",
+        "dataLocale": "[parameters('DataLocale')]",
+        "compatibilityLevel": "[parameters('CompatibilityLevel')]",
+        "contentStoragePolicy": "[parameters('ContentStoragePolicy')]",
+        "transformation": {
+          "name": "Transformation",
+          "properties": {
+            "streamingUnits": "[parameters('Transformation').StreamingUnits]",
+            "query": "WITH TEMPIMCOUNT AS(SELECT 'Immigration Screening' as Location,\r\n                200000 as QAreaId,\r\n                'Immigration Screening - Person Count' as QAreaName,\r\n                6 as StartPoint,\r\n                7 as EndPoint,\r\n                'Central Immigration' as ZoneName,\r\n                eventTime as Timestamp ,\r\n                value as PersonCount,\r\n                'zensors-immigrationcount' as SourceSystemName,\r\n                'ork' as SourceInstanceName,\r\n                cast(0 as bigint) as BatchId  FROM [stream-zensors-immigrationcount] WHERE EntityEventFeed = 'ImmigrationCount' ),\r\nIMCOUNT AS (SELECT  Location,QAreaId,QAreaName,ZoneName,StartPoint,EndPoint,  Timestamp, MIN(PersonCount) as QMin, MAX(PersonCount) as QMax, AVG(Personcount) as QAvg, uda.custommedian(PersonCount) as QMed,SourceSystemName,SourceInstanceName,BatchId\r\n    FROM TEMPIMCOUNT\r\n    GROUP BY SourceSystemName,SourceInstanceName,BatchId,Location,QAreaId,QAreaName,ZoneName,StartPoint,EndPoint, Timestamp, TumblingWindow(minute,3)),\r\nZENSORSIMCOUNT AS (SELECT \r\n    Location,\r\n    QAreaId,\r\n    QAreaName,\r\n    udf.timestamptostr(DATEADD(second,-59,udf.strtotimestamp(Timestamp))) AS QFrom,\r\n    udf.strtotimestamp(Timestamp) as QTo,\r\n    StartPoint,\r\n    EndPoint,\r\n    ZoneName,\r\n    'Regular' as Outcome,\r\n    QMin,\r\n    QMAX,\r\n    QAvg,\r\n    QMed,\r\n    udf.nvl(QAvg,0) as QTimeSecs,\r\n    0 as QSampleCount, \r\n    'Cork' as Terminal,\r\n    SourceSystemName,\r\n    SourceInstanceName,\r\n    BatchId FROM IMCOUNT),\r\nSampleCountIMPC AS ( SELECT zdf.QFrom,MAX(zdf.QMed) as QSampleCount\r\n    FROM ZENSORSIMCOUNT zdf\r\n    Inner Join [ref-location] loc on CAST(zdf.StartPoint as nvarchar(max)) = udf.split(loc.[System Device ID],'_',2)\r\n            and  CAST(zdf.EndPoint AS nvarchar(max)) = udf.split(loc.[System Device ID],'_',3)\r\n    WHERE udf.split(loc.[System Device ID],'_',0) = '200000' and lower(zdf.ZoneName) = lower(loc.[Sub Area])\r\n    Group by zdf.QFrom, TumblingWindow(minute,1)\r\n),\r\nSampleCountIMWT as (SELECT zdf.QFrom,MAX(zdf.QMed) as QSampleCount\r\n    FROM ZENSORSIMCOUNT zdf\r\n    Inner Join [ref-location]  loc on CAST(zdf.StartPoint as nvarchar(max)) = udf.split(loc.[System Device ID],'_',2)\r\n            and  CAST(zdf.EndPoint AS nvarchar(max)) = udf.split(loc.[System Device ID],'_',3)\r\n    WHERE udf.split(loc.[System Device ID],'_',0) = '400000' and lower(zdf.ZoneName) = lower(loc.[Sub Area])\r\n    Group by zdf.QFrom, TumblingWindow(minute,1)\r\n),\r\nIMCOUNTFINAL AS ( SELECT CONCAT(CAST(udf.pad(DATEPART(hour,queue.QTo))as nvarchar(max)),':',CAST(udf.pad(DATEPART(minute,queue.QTo))as nvarchar(max))) as QTo_Time,\r\n\t\tqueue.QTo,\r\n        concat(queue.QAreaId,'_',queue.Outcome,'_',queue.StartPoint,'_',queue.EndPoint) as System_Device_ID,\r\n        \r\n        CAST(queue.QTimeSecs as bigint) AS QTime_Secs ,\r\n\t\tqueue.Terminal,\r\n\t\t\r\n\t\tqueue.SourceInstanceName AS Airport,\r\n        Case When queue.QAreaId in (100000)\r\n\t\t    Then CAST(udf.nvl(spc.QSampleCount,0) AS bigint)\r\n            When queue.QAreaId in (300000)\r\n\t\t\tThen CAST(udf.nvl(swt.QSampleCount,0)AS bigint)\r\n            Else CAST(udf.nvl(queue.QSampleCount,0) AS bigint)\r\n        End as QSampleCount \r\n        FROM ZENSORSIMCOUNT queue\r\n        LEFT JOIN SampleCountIMPC spc on spc.QFrom = queue.QFrom AND DATEDIFF(minute,queue,spc) BETWEEN 0 AND 1\r\n        LEFT JOIN SampleCountIMWT swt on swt.QFrom = queue.QFrom AND DATEDIFF(minute,queue,swt) BETWEEN 0 AND 1\r\n),\r\nTEMPIMQUEUE AS (Select 'Immigration Screening' as Location,\r\n                100000 as QAreaId,\r\n                'Immigration Screening - Wait Time' as QAreaName,\r\n                6 as StartPoint,\r\n                7 as EndPoint,\r\n                'Central Immigration' as ZoneName,\r\n                eventTime as Timestamp ,\r\n                value*60 as WaitTime,\r\n                'zensors-immigrationqueue' as SourceSystemName,\r\n                'ork' as SourceInstanceName,\r\n                cast(0 as bigint) as BatchId \r\n        FROM [stream-zensors-immigrationqueue] WHERE EntityEventFeed = 'ImmigrationQueue'\r\n\r\n),\r\nIMQUEUE AS ( SELECT Location,QAreaId,QAreaName,ZoneName,StartPoint,EndPoint,Timestamp, MIN(WaitTime) as QMin, MAX(WaitTime) as QMax, AVG(WaitTime) as QAvg, uda.custommedian(WaitTime) as QMed,SourceSystemName,SourceInstanceName,BatchId\r\n    FROM TEMPIMQUEUE\r\n        \r\n    GROUP BY SourceSystemName,SourceInstanceName,BatchId,Location,QAreaId,QAreaName,ZoneName,StartPoint,EndPoint,Timestamp,TumblingWindow(minute,3)\r\n),\r\nZENSORSIMQUEUE AS (SELECT \r\n    Location,\r\n    QAreaId,\r\n    QAreaName,\r\n    udf.timestamptostr(DATEADD(second,-59,udf.strtotimestamp(Timestamp))) AS QFrom,\r\n    udf.strtotimestamp(Timestamp) as QTo,\r\n    StartPoint,\r\n    EndPoint,\r\n    ZoneName,\r\n    'Regular' as Outcome,\r\n    QMin,\r\n    QMAX,\r\n    QAvg,\r\n    QMed,\r\n   udf.nvl(QAvg,0) as QTimeSecs,\r\n    0 as QSampleCount, \r\n    'Cork' as Terminal,\r\n    SourceSystemName,\r\n    SourceInstanceName,\r\n    BatchId FROM IMQUEUE),\r\nSampleCountIQPC AS ( SELECT zdf.QFrom,MAX(zdf.QMed) as QSampleCount\r\n    FROM ZENSORSIMQUEUE zdf\r\n    Inner Join [ref-location] loc on CAST(zdf.StartPoint as nvarchar(max)) = udf.split(loc.[System Device ID],'_',2)\r\n            and  CAST(zdf.EndPoint AS nvarchar(max)) = udf.split(loc.[System Device ID],'_',3)\r\n    WHERE udf.split(loc.[System Device ID],'_',0) = '200000' and lower(zdf.ZoneName) = lower(loc.[Sub Area])\r\n    Group by zdf.QFrom, TumblingWindow(minute,1)\r\n),\r\nSampleCountIQWT as (SELECT zdf.QFrom,MAX(zdf.QMed) as QSampleCount\r\n    FROM ZENSORSIMQUEUE zdf\r\n    Inner Join [ref-location]  loc on CAST(zdf.StartPoint as nvarchar(max)) = udf.split(loc.[System Device ID],'_',2)\r\n            and  CAST(zdf.EndPoint AS nvarchar(max)) = udf.split(loc.[System Device ID],'_',3)\r\n    WHERE udf.split(loc.[System Device ID],'_',0) = '400000' and lower(zdf.ZoneName) = lower(loc.[Sub Area])\r\n    Group by zdf.QFrom, TumblingWindow(minute,1)\r\n),\r\nIMQUEUEFINAL AS ( SELECT  CONCAT(CAST(udf.pad(DATEPART(hour,queue.QTo))as nvarchar(max)),':',CAST(udf.pad(DATEPART(minute,queue.QTo))as nvarchar(max))) as QTo_Time,\r\n\t\tqueue.QTo,\r\n        concat(queue.QAreaId,'_',queue.Outcome,'_',queue.StartPoint,'_',queue.EndPoint) as System_Device_ID,\r\n        \r\n        CAST(queue.QTimeSecs as bigint) AS QTime_Secs ,\r\n\t\tqueue.Terminal,\r\n\t\t\r\n\t\tqueue.SourceInstanceName AS Airport,\r\n        Case When queue.QAreaId in (100000)\r\n\t\t    Then CAST(udf.nvl(spc.QSampleCount,0)AS bigint)\r\n            When queue.QAreaId in (300000)\r\n\t\t\tThen cast(udf.nvl(swt.QSampleCount,0)as bigint)\r\n            Else cast(udf.nvl(queue.QSampleCount,0)as bigint )\r\n        End as QSampleCount \r\n        FROM ZENSORSIMQUEUE queue\r\n        LEFT JOIN SampleCountIQPC spc on spc.QFrom = queue.QFrom AND DATEDIFF(minute,queue,spc) BETWEEN 0 AND 1\r\n        LEFT JOIN SampleCountIQWT swt on swt.QFrom = queue.QFrom AND DATEDIFF(minute,queue,swt) BETWEEN 0 AND 1\r\n),\r\nTEMPPAXCOUNT AS (SELECT  'Passenger Screening' as Location,\r\n                400000 as QAreaId, \r\n                'Passenger Screening - Person Count' as QAreaName,\r\n                7 as StartPoint,\r\n                8 as EndPoint,\r\n                'Central Search' as ZoneName,\r\n                eventTime  as Timestamp ,\r\n                value as PersonCount,\r\n                'zensors-passengercount' as SourceSystemName,\r\n                'ork' as SourceInstanceName,\r\n                cast(0 as bigint) as BatchId  FROM [stream-zensors-passengercount] WHERE EntityEventFeed = 'PassengerCount'  ),\r\nPAXCOUNT AS (SELECT Location,QAreaId,QAreaName,ZoneName,StartPoint,EndPoint,Timestamp, MIN(PersonCount) as QMin, MAX(PersonCount) as QMax, AVG(PersonCount) as QAvg, uda.custommedian(PersonCount) as QMed,SourceSystemName,SourceInstanceName,BatchId\r\n    FROM TEMPPAXCOUNT\r\n        \r\n    GROUP BY SourceSystemName,SourceInstanceName,BatchId,Location,QAreaId,QAreaName,ZoneName,StartPoint,EndPoint,Timestamp,TumblingWindow(minute,3)),\r\nZENSORSPAXCOUNT AS (SELECT \r\n    Location,\r\n    QAreaId,\r\n    QAreaName,\r\n    udf.timestamptostr(DATEADD(second,-59,udf.strtotimestamp(Timestamp))) AS QFrom,\r\n    udf.strtotimestamp(Timestamp) as QTo,\r\n    StartPoint,\r\n    EndPoint,\r\n    ZoneName,\r\n    'Regular' as Outcome,\r\n    QMin,\r\n    QMAX,\r\n    QAvg,\r\n    QMed,\r\n    udf.nvl(QAvg,0)as QTimeSecs,\r\n    0 as QSampleCount, \r\n    'Cork' as Terminal,\r\n    SourceSystemName,\r\n    SourceInstanceName,\r\n    BatchId FROM PAXCOUNT),\r\nSampleCountPAXCountPC AS ( SELECT zdf.QFrom,MAX(zdf.QMed) as QSampleCount\r\n    FROM ZENSORSPAXCOUNT zdf\r\n    Inner Join [ref-location] loc on CAST(zdf.StartPoint as nvarchar(max)) = udf.split(loc.[System Device ID],'_',2)\r\n            and  CAST(zdf.EndPoint AS nvarchar(max)) = udf.split(loc.[System Device ID],'_',3)\r\n    WHERE udf.split(loc.[System Device ID],'_',0) = '200000' and lower(zdf.ZoneName) = lower(loc.[Sub Area])\r\n    Group by zdf.QFrom, TumblingWindow(minute,1)\r\n),\r\nSampleCountPAXCountWT as (SELECT zdf.QFrom,MAX(zdf.QMed) as QSampleCount\r\n    FROM ZENSORSPAXCOUNT zdf\r\n    Inner Join [ref-location]  loc on CAST(zdf.StartPoint as nvarchar(max)) = udf.split(loc.[System Device ID],'_',2)\r\n            and  CAST(zdf.EndPoint AS nvarchar(max)) = udf.split(loc.[System Device ID],'_',3)\r\n    WHERE udf.split(loc.[System Device ID],'_',0) = '400000' and lower(zdf.ZoneName) = lower(loc.[Sub Area])\r\n    Group by zdf.QFrom, TumblingWindow(minute,1)\r\n),\r\nPAXCOUNTFINAL AS (SELECT CONCAT(CAST(udf.pad(DATEPART(hour,queue.QTo))as nvarchar(max)),':',CAST(udf.pad(DATEPART(minute,queue.QTo))as nvarchar(max))) as QTo_Time,\r\n\t\tqueue.QTo,\r\n        concat(queue.QAreaId,'_',queue.Outcome,'_',queue.StartPoint,'_',queue.EndPoint) as System_Device_ID,\r\n        \r\n        CAST(queue.QTimeSecs as bigint) AS QTime_Secs ,\r\n\t\tqueue.Terminal,\r\n        queue.SourceInstanceName as Airport,\r\n        Case When queue.QAreaId in (100000)\r\n\t\t    Then CAST(udf.nvl(spc.QSampleCount,0) AS bigint)\r\n            When queue.QAreaId in (300000)\r\n\t\t\tThen cast(udf.nvl(swt.QSampleCount,0)as bigint)\r\n            Else cast(udf.nvl(queue.QSampleCount,0)as bigint )\r\n        End as QSampleCount \r\n        FROM ZENSORSPAXCOUNT queue\r\n        LEFT JOIN SampleCountPAXCountPC spc on spc.QFrom = queue.QFrom AND DATEDIFF(minute,queue,spc) BETWEEN 0 AND 1\r\n        LEFT JOIN SampleCountPAXCountWT swt on swt.QFrom = queue.QFrom AND DATEDIFF(minute,queue,swt) BETWEEN 0 AND 1\r\n),\r\nTEMPPAXQUEUE AS (SELECT 'Passenger Screening' as Location,\r\n                300000 QAreaId,\r\n                'Passenger Screening - Wait Time' as QAreaName,\r\n                7 as StartPoint,\r\n                8 as EndPoint,\r\n                'Central Search' as ZoneName,\r\n                eventTime as Timestamp ,\r\n                value* 60 as WaitTime,\r\n                'zensors-passengerqueue' as SourceSystemName,\r\n                'ork' as SourceInstanceName,\r\n                cast(0 as bigint) as BatchId  FROM [stream-zensors-passengerqueue] WHERE EntityEventFeed = 'PassengerQueue' ),\r\nPAXQUEUE AS (SELECT Location,QAreaId,QAreaName,ZoneName,StartPoint,EndPoint,Timestamp, MIN(WaitTime) as QMin, MAX(WaitTime) as QMax, AVG(WaitTime) as QAvg, uda.custommedian(WaitTime) as QMed,SourceSystemName,SourceInstanceName,BatchId\r\n    FROM TEMPPAXQUEUE\r\n        \r\n    GROUP BY SourceSystemName,SourceInstanceName,BatchId,Location,QAreaId,QAreaName,ZoneName,StartPoint,EndPoint,Timestamp,TumblingWindow(minute,3)),\r\nZENSORSPAXQUEUE AS (SELECT \r\n    Location,\r\n    QAreaId,\r\n    QAreaName,\r\n    udf.timestamptostr(DATEADD(second,-59,udf.strtotimestamp(Timestamp))) AS QFrom,\r\n    udf.strtotimestamp(Timestamp) as QTo,\r\n    StartPoint,\r\n    EndPoint,\r\n    ZoneName,\r\n    'Regular' as Outcome,\r\n    QMin,\r\n    QMAX,\r\n    QAvg,\r\n    QMed,\r\n    udf.nvl(QAvg,0) as QTimeSecs,\r\n    0 as QSampleCount, \r\n    'Cork' as Terminal,\r\n    SourceSystemName,\r\n    SourceInstanceName,\r\n    BatchId FROM PAXQUEUE),\r\nSampleCountPAXQueuePC AS ( SELECT zdf.QFrom,MAX(zdf.QMed) as QSampleCount\r\n    FROM ZENSORSPAXQUEUE zdf\r\n    Inner Join [ref-location] loc on CAST(zdf.StartPoint as nvarchar(max)) = udf.split(loc.[System Device ID],'_',2)\r\n            and  CAST(zdf.EndPoint AS nvarchar(max)) = udf.split(loc.[System Device ID],'_',3)\r\n    WHERE udf.split(loc.[System Device ID],'_',0) = '200000' and lower(zdf.ZoneName) = lower(loc.[Sub Area])\r\n    Group by zdf.QFrom, TumblingWindow(minute,1)\r\n),\r\nSampleCountPAXQueueWT as (SELECT zdf.QFrom,MAX(zdf.QMed) as QSampleCount\r\n    FROM ZENSORSPAXQUEUE zdf\r\n    Inner Join [ref-location]  loc on CAST(zdf.StartPoint as nvarchar(max)) = udf.split(loc.[System Device ID],'_',2)\r\n            and  CAST(zdf.EndPoint AS nvarchar(max)) = udf.split(loc.[System Device ID],'_',3)\r\n    WHERE udf.split(loc.[System Device ID],'_',0) = '400000' and lower(zdf.ZoneName) = lower(loc.[Sub Area])\r\n    Group by zdf.QFrom, TumblingWindow(minute,1)\r\n),\r\nPAXQUEUEFINAL AS (SELECT CONCAT(CAST(udf.pad(DATEPART(hour,queue.QTo))as nvarchar(max)),':',CAST(udf.pad(DATEPART(minute,queue.QTo))as nvarchar(max))) as QTo_Time,\r\n\t\tqueue.QTo,\r\n        concat(queue.QAreaId,'_',queue.Outcome,'_',queue.StartPoint,'_',queue.EndPoint) as System_Device_ID,\r\n        \r\n        CAST(queue.QTimeSecs as bigint) AS QTime_Secs ,\r\n\t\tqueue.Terminal,\r\n        queue.SourceInstanceName as Airport,\r\n        Case When queue.QAreaId in (100000)\r\n\t\t    Then cast(udf.nvl(spc.QSampleCount,0)as bigint)\r\n            When queue.QAreaId in (300000)\r\n\t\t\tThen cast(udf.nvl(swt.QSampleCount,0)as bigint)\r\n            Else cast(udf.nvl(queue.QSampleCount,0)as bigint) \r\n        End as QSampleCount \r\n        FROM ZENSORSPAXQUEUE queue\r\n        LEFT JOIN SampleCountPAXQueuePC spc on spc.QFrom = queue.QFrom AND DATEDIFF(minute,queue,spc) BETWEEN 0 AND 1\r\n        LEFT JOIN SampleCountPAXQueueWT swt on swt.QFrom = queue.QFrom AND DATEDIFF(minute,queue,swt) BETWEEN 0 AND 1\r\n),\r\n\r\n\r\nTEMPBLIP AS (SELECT CAST(QMin as bigint) AS QMin,\r\nDATEADD(minute,-15,udf.strtotimestamp(QTimestamp)) as QFrom,\r\nudf.strtotimestamp(QTimestamp) as QTo,\r\n\r\nCAST(QMax AS  bigint) AS QMax,\r\nZoneName,\r\nStartPoint,\r\nEndPoint,\r\nAnalysisId,\r\nOutcome,\r\nQStartPoint,\r\nQEndPoint,\r\n\r\nCAST(QAverage as bigint) as QAvg,\r\nCAST(QMedian AS bigint) as QMed,\r\nCASE WHEN CAST(QMedian AS bigint) = 0 THEN 0 ELSE CAST(QMedian as bigint) END AS QTimeSecs ,\r\nMinimumSampleCount,\r\nCASE WHEN ReportName like '%T1%' THEN 'T1'\r\n\t WHEN ReportName like '%T2%' THEN 'T2'\r\n     ELSE 'UNK'\r\nEND Terminal,\r\n'Dublin' AS Airport,\r\nCAST(QSampleCount AS bigint) AS QSampleCount\r\nFROM [stream-blip-dwelltime] WHERE EntityEventFeed = 'Blip'),\r\n\r\nBLIP AS(SELECT\r\n\t\t\t\tCONCAT(CAST(udf.pad(DATEPART(hour,QTo))as nvarchar(max)),':',CAST(udf.pad(DATEPART(minute,QTo))as nvarchar(max))) as QTo_Time,\r\n                QTo,\r\n\t\t\t\tconcat(AnalysisId,'_',Outcome,'_',QStartPoint,'_',QEndPoint) as System_Device_ID,\r\n                \r\n\t\t\t\tCASE WHEN udf.nvl(CAST(QSampleCount AS bigint),0) >= udf.nvl(CAST(MinimumSampleCount AS bigint),0) THEN  udf.nvl(QTimeSecs,0) ELSE 0 END as QTime_Secs,\r\n\t\t\t\tTerminal,\r\n\t\t\t\tAirport,\r\n\t\t\t\tudf.nvl(QSampleCount,0) AS QSampleCount FROM TEMPBLIP WHERE QStartPoint = StartPoint and QEndPoint = EndPoint),\r\nQUEUEMGMT AS (SELECT *,CASE WHEN QTime_Secs = 0 THEN '00:00' ELSE udf.converttominutes(QTime_Secs) END AS QTime FROM BLIP UNION SELECT *,CASE WHEN QTime_Secs = 0 THEN '00:00' ELSE udf.converttominutes(QTime_Secs) END AS QTime FROM IMCOUNTFINAL UNION SELECT *,CASE WHEN QTime_Secs = 0 THEN '00:00' ELSE udf.converttominutes(QTime_Secs) END AS QTime FROM IMQUEUEFINAL UNION SELECT *,CASE WHEN QTime_Secs = 0 THEN '00:00' ELSE udf.converttominutes(QTime_Secs) END AS QTime FROM PAXCOUNTFINAL UNION SELECT *,CASE WHEN QTime_Secs = 0 THEN '00:00' ELSE udf.converttominutes(QTime_Secs) END AS QTime FROM PAXQUEUEFINAL  )\r\n\r\n\r\nSELECT * INTO [out-pbi-ds-queuemetrics] FROM QUEUEMGMT\r\n\r\n--SELECT * INTO [out-blob-test] FROM QUEUEMGMT"
+          }
+        },
+        "inputs": [
+          {
+            "name": "stream-blip-dwelltime",
+            "properties": {
+              "type": "Stream",
+              "datasource": {
+                "type": "Microsoft.ServiceBus/EventHub",
+                "properties": {
+                  "consumerGroupName": "[parameters('Inputs_stream-blip-dwelltime').DataSource.ConsumerGroupName]",
+                  "eventHubName": "[parameters('Inputs_stream-blip-dwelltime').DataSource.EventHubName]",
+                  "serviceBusNamespace": "[parameters('Inputs_stream-blip-dwelltime').DataSource.ServiceBusNamespace]",
+                  "authenticationMode": "[parameters('Inputs_stream-blip-dwelltime').DataSource.AuthenticationMode]"
+                }
+              },
+              "compression": {
+                "type": "None"
+              },
+              "serialization": {
+                "type": "Json",
+                "properties": {
+                  "encoding": "UTF8"
+                }
+              }
+            }
+          },
+          {
+            "name": "stream-blipperuser-exportperuser",
+            "properties": {
+              "type": "Stream",
+              "datasource": {
+                "type": "Microsoft.ServiceBus/EventHub",
+                "properties": {
+                  "consumerGroupName": "[parameters('Inputs_stream-blipperuser-exportperuser').DataSource.ConsumerGroupName]",
+                  "eventHubName": "[parameters('Inputs_stream-blipperuser-exportperuser').DataSource.EventHubName]",
+                  "serviceBusNamespace": "[parameters('Inputs_stream-blipperuser-exportperuser').DataSource.ServiceBusNamespace]",
+                  "authenticationMode": "[parameters('Inputs_stream-blipperuser-exportperuser').DataSource.AuthenticationMode]"
+                }
+              },
+              "compression": {
+                "type": "None"
+              },
+              "serialization": {
+                "type": "Json",
+                "properties": {
+                  "encoding": "UTF8"
+                }
+              }
+            }
+          },
+          {
+            "name": "stream-zensors-immigrationcount",
+            "properties": {
+              "type": "Stream",
+              "datasource": {
+                "type": "Microsoft.ServiceBus/EventHub",
+                "properties": {
+                  "consumerGroupName": "[parameters('Inputs_stream-zensors-immigrationcount').DataSource.ConsumerGroupName]",
+                  "eventHubName": "[parameters('Inputs_stream-zensors-immigrationcount').DataSource.EventHubName]",
+                  "serviceBusNamespace": "[parameters('Inputs_stream-zensors-immigrationcount').DataSource.ServiceBusNamespace]",
+                  "authenticationMode": "[parameters('Inputs_stream-zensors-immigrationcount').DataSource.AuthenticationMode]"
+                }
+              },
+              "compression": {
+                "type": "None"
+              },
+              "serialization": {
+                "type": "Json",
+                "properties": {
+                  "encoding": "UTF8"
+                }
+              }
+            }
+          },
+          {
+            "name": "stream-zensors-immigrationqueue",
+            "properties": {
+              "type": "Stream",
+              "datasource": {
+                "type": "Microsoft.ServiceBus/EventHub",
+                "properties": {
+                  "consumerGroupName": "[parameters('Inputs_stream-zensors-immigrationqueue').DataSource.ConsumerGroupName]",
+                  "eventHubName": "[parameters('Inputs_stream-zensors-immigrationqueue').DataSource.EventHubName]",
+                  "serviceBusNamespace": "[parameters('Inputs_stream-zensors-immigrationqueue').DataSource.ServiceBusNamespace]",
+                  "authenticationMode": "[parameters('Inputs_stream-zensors-immigrationqueue').DataSource.AuthenticationMode]"
+                }
+              },
+              "compression": {
+                "type": "None"
+              },
+              "serialization": {
+                "type": "Json",
+                "properties": {
+                  "encoding": "UTF8"
+                }
+              }
+            }
+          },
+          {
+            "name": "stream-zensors-passengercount",
+            "properties": {
+              "type": "Stream",
+              "datasource": {
+                "type": "Microsoft.ServiceBus/EventHub",
+                "properties": {
+                  "consumerGroupName": "[parameters('Inputs_stream-zensors-passengercount').DataSource.ConsumerGroupName]",
+                  "eventHubName": "[parameters('Inputs_stream-zensors-passengercount').DataSource.EventHubName]",
+                  "serviceBusNamespace": "[parameters('Inputs_stream-zensors-passengercount').DataSource.ServiceBusNamespace]",
+                  "authenticationMode": "[parameters('Inputs_stream-zensors-passengercount').DataSource.AuthenticationMode]"
+                }
+              },
+              "compression": {
+                "type": "None"
+              },
+              "serialization": {
+                "type": "Json",
+                "properties": {
+                  "encoding": "UTF8"
+                }
+              }
+            }
+          },
+          {
+            "name": "stream-zensors-passengerqueue",
+            "properties": {
+              "type": "Stream",
+              "datasource": {
+                "type": "Microsoft.ServiceBus/EventHub",
+                "properties": {
+                  "consumerGroupName": "[parameters('Inputs_stream-zensors-passengerqueue').DataSource.ConsumerGroupName]",
+                  "eventHubName": "[parameters('Inputs_stream-zensors-passengerqueue').DataSource.EventHubName]",
+                  "serviceBusNamespace": "[parameters('Inputs_stream-zensors-passengerqueue').DataSource.ServiceBusNamespace]",
+                  "authenticationMode": "[parameters('Inputs_stream-zensors-passengerqueue').DataSource.AuthenticationMode]"
+                }
+              },
+              "compression": {
+                "type": "None"
+              },
+              "serialization": {
+                "type": "Json",
+                "properties": {
+                  "encoding": "UTF8"
+                }
+              }
+            }
+          },
+          {
+            "name": "ref-location",
+            "properties": {
+              "type": "Reference",
+              "datasource": {
+                "type": "Microsoft.Storage/Blob",
+                "properties": {
+                  "storageAccounts": [
+                    {
+                      "accountName": "[parameters('Inputs_ref-location').DataSource.AccountName]"
+                    }
+                  ],
+                  "container": "[parameters('Inputs_ref-location').DataSource.Container]",
+                  "pathPattern": "[parameters('Inputs_ref-location').DataSource.PathPattern]",
+                  "dateFormat": "[parameters('Inputs_ref-location').DataSource.DateFormat]",
+                  "timeFormat": "[parameters('Inputs_ref-location').DataSource.TimeFormat]",
+                  "authenticationMode": "[parameters('Inputs_ref-location').DataSource.AuthenticationMode]"
+                }
+              },
+              "serialization": {
+                "type": "Csv",
+                "properties": {
+                  "fieldDelimiter": ",",
+                  "encoding": "UTF8"
+                }
+              }
+            }
+          },
+          {
+            "name": "stream-test",
+            "properties": {
+              "type": "Stream",
+              "datasource": {
+                "type": "Microsoft.Storage/Blob",
+                "properties": {
+                  "sourcePartitionCount": "[parameters('Inputs_stream-test').DataSource.SourcePartitionCount]",
+                  "storageAccounts": [
+                    {
+                      "accountName": "[parameters('Inputs_stream-test').DataSource.AccountName]"
+                    }
+                  ],
+                  "container": "[parameters('Inputs_stream-test').DataSource.Container]",
+                  "pathPattern": "[parameters('Inputs_stream-test').DataSource.PathPattern]",
+                  "dateFormat": "[parameters('Inputs_stream-test').DataSource.DateFormat]",
+                  "timeFormat": "[parameters('Inputs_stream-test').DataSource.TimeFormat]",
+                  "authenticationMode": "[parameters('Inputs_stream-test').DataSource.AuthenticationMode]"
+                }
+              },
+              "compression": {
+                "type": "None"
+              },
+              "serialization": {
+                "type": "Json",
+                "properties": {
+                  "encoding": "UTF8"
+                }
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out-pbi-ds-queuemetrics",
+            "properties": {
+              "datasource": {
+                "type": "PowerBI",
+                "properties": {
+                  "dataset": "[parameters('Outputs_out-pbi-ds-queuemetrics').DataSource.DataSet]",
+                  "table": "[parameters('Outputs_out-pbi-ds-queuemetrics').DataSource.DatasetTable]",
+                  "groupId": "[parameters('Outputs_out-pbi-ds-queuemetrics').DataSource.GroupId]",
+                  "authenticationMode": "[parameters('Outputs_out-pbi-ds-queuemetrics').DataSource.AuthenticationMode]"
+                }
+              }
+            }
+          }
+        ],
+        "functions": [
+          {
+            "name": "converttofloat",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "float"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "// Sample UDF which returns sum of two values.\r\nfunction converttofloat(value) {\r\n    return parseFloat(value);\r\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "converttominutes",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "nvarchar(max)"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "// Sample UDF which returns sum of two values.\r\nfunction converttominutes(seconds) {\r\n    minutes = Math.floor(seconds/60);\r\n    var remainingSeconds = seconds%60;\r\n    var formattedMinutes = String(minutes).padStart(2,'0');\r\n    var formattedSeconds = String(remainingSeconds).padStart(2,'0');\r\n    return formattedMinutes.concat(':',formattedSeconds);\r\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "trim",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "nvarchar(max)"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "// Sample UDF which returns sum of two values.\r\nfunction trim(variable) {\r\n    var trimvariable = trim(variable)\r\n    return trimvariable;\r\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "custommedian",
+            "properties": {
+              "type": "Aggregate",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "float"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "// Sample UDA which sums incoming values.\r\nfunction main() {\r\n    this.init = function () {\r\n        this.data = [];\r\n    }\r\n\r\n    this.accumulate = function (value, timestamp) {\r\n        this.data.push(value);\r\n    }\r\n\r\n    this.deaccumulate = function (value, timestamp) {\r\n        const index = this.data.indexOf(value);\r\n        if(index !== -1){\r\n            this.data.splice(index,1);\r\n        }\r\n    }\r\n\r\n    this.deaccumulateState = function (otherState) {\r\n        otherState.data.forEach((value) => {\r\n            const index = this.data.indexOf(value);\r\n            if(index !== -1){\r\n                this.data.splice(index,1);\r\n            }\r\n        })\r\n    }\r\n\r\n    this.computeResult = function () {\r\n        const sortedData = this.data.sort((a,b) => a-b);\r\n        const length = sortedData.length;\r\n\r\n        if(length === 0){\r\n            return null;\r\n        }\r\n        const midIndex = Math.floor(length/2);\r\n        if(length % 2 === 0){\r\n            return (sortedData[midIndex-1]+sortedData[midIndex])/2;\r\n        } else{\r\n            return sortedData[midIndex];\r\n        }\r\n    };\r\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "median",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "float"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "// Sample UDF which returns sum of two values.\r\nfunction median(numbers) {\r\n    const sorted = Array.from(numbers).sort((a,b)=>a-b)\r\n    const middle = Math.floor(sorted.length/2);\r\n    if(sorted.length % 2 ===0){\r\n        return(sorted[middle - 1]+sorted[middle])/2;\r\n    }\r\n    return sorted[middle];\r\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "nvl",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  },
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "any"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "// Sample UDF which returns sum of two values.\r\nfunction nvl(value,defaultValue) {\r\n    return (value !== null)? value : defaultValue;\r\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "pad",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "nvarchar(max)"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "// Sample UDF which returns sum of two values.\r\nfunction pad(timepart) {\r\n    var formattedTimePart = String(timepart).padStart(2,'0');\r\n    return formattedTimePart;\r\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "split",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  },
+                  {
+                    "dataType": "any"
+                  },
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "nvarchar(max)"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "// Sample UDF which returns sum of two values.\r\nfunction split(str,delimiter,index) {\r\n    return str.split(delimiter)[index];\r\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "strtotimestamp",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "datetime"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "// Sample UDF which returns sum of two values.\r\nfunction strtotimestamp(eventtime) {\r\n    var year = eventtime.substring(0,4);\r\n    var month = eventtime.substring(5,7);\r\n    var day = eventtime.substring(8,10);\r\n    var time = eventtime.substring(10,16);\r\n    var dateTimeString = year+'-'+month+'-'+day+'T'+time;\r\n    var convertedDateTime = new Date(dateTimeString)\r\n\r\n    convertedDateTime.setHours(convertedDateTime.getHours()-7)\r\n\r\n    return convertedDateTime;\r\n}"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "timestamptostr",
+            "properties": {
+              "type": "Scalar",
+              "properties": {
+                "inputs": [
+                  {
+                    "dataType": "any"
+                  }
+                ],
+                "output": {
+                  "dataType": "nvarchar(max)"
+                },
+                "binding": {
+                  "type": "Microsoft.StreamAnalytics/JavascriptUdf",
+                  "properties": {
+                    "script": "function timestamptostr(dateTime){\r\n\tvar date = dateTime.substring(0,10);\r\n    var time = dateTime.substring(11,16);\r\n    var dateString = date + ' '+ time;\r\n\r\n\t\r\n\treturn dateString;\r\n}"
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "jobType": "Cloud"
+      }
+    }
+  ]
+}
