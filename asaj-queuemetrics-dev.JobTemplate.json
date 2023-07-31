@@ -18,29 +18,7 @@
       "type": "object"
     },
     "Inputs_stream-blipperuser-exportperuser": {
-      "type": "object"
-    },
-    "Inputs_stream-zensors-immigrationcount": {
-      "type": "object"
-    },
-    "Inputs_stream-zensors-immigrationqueue": {
-      "type": "object"
-    },
-    "Inputs_stream-zensors-passengercount": {
-      "type": "object"
-    },
-    "Inputs_stream-zensors-passengerqueue": {
-      "type": "object"
-    },
-    "Inputs_ref-location": {
-      "type": "object"
-    },
-    "Inputs_stream-test": {
-      "type": "object"
-    },
-    "Outputs_out-pbi-ds-queuemetrics": {
-      "type": "object"
-    }
+     
   },
   "resources": [
     {
